@@ -44,21 +44,7 @@ defmodule Phoenix.PubSub.Redis do
 
   @doc false
   def init([server_name, opts]) do
-    if opts[:url] do
-      info = URI.parse(opts[:url])
-      user_opts =
-        case String.split(info.userinfo || "", ":") do
-          [""]                 -> []
-          [username]           -> [username: username]
-          [username, password] -> [username: username, password: password]
-        end
-
-      opts =
-        opts
-        |> Keyword.merge(user_opts)
-        |> Keyword.merge(host: info.host, port: info.port || @defaults[:port])
-    end
-
+    opts = Keyword.merge(opts, url_options(opts[:url]))
     opts = Keyword.merge(@defaults, opts)
     opts = Keyword.merge(opts, host: String.to_char_list(opts[:host]))
     if pass = opts[:password] do
@@ -95,6 +81,21 @@ defmodule Phoenix.PubSub.Redis do
       worker(Phoenix.PubSub.Local, [local_name]),
     ]
     supervise children, strategy: :one_for_all
+  end
+
+  defp url_options(nil), do: []
+  defp url_options({:system, var}), do: url_options(System.get_env(var))
+  defp url_options(url) do
+    info = URI.parse(url)
+    user_opts =
+      case String.split(info.userinfo || "", ":") do
+        [""]                 -> []
+        [username]           -> [username: username]
+        [username, password] -> [username: username, password: password]
+      end
+
+    port = info.port || @defaults.port
+    Keyword.merge(user_opts, host: info.host, port: port)
   end
 
   defp redis_namespace(server_name), do: "phx:#{server_name}"
